@@ -50,6 +50,10 @@ let package = Package(
             name: "A2UIAppKit",
             targets: ["A2UIAppKit"]
         ),
+        .library(
+            name: "Vecanv",
+            targets: ["Vecanv"]
+        ),
     ],
     targets: [
         .target(
@@ -78,6 +82,16 @@ let package = Package(
             name: "A2UIAppKit",
             dependencies: ["A2UISwiftCore"],
             path: "Sources/A2UIAppKit"
+        ),
+        .target(
+            name: "Vecanv",
+            dependencies: ["Primitives", "A2UISwiftCore", "A2UISwiftUI"],
+            path: "Sources/Vecanv"
+        ),
+        .testTarget(
+            name: "VecanvTests",
+            dependencies: ["Vecanv"],
+            path: "Tests/VecanvTests"
         ),
         .testTarget(
             name: "PrimitivesTests",
