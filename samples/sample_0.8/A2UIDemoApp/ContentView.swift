@@ -128,6 +128,18 @@ struct ContentView: View {
                     Text("Connect to live agents running on localhost.")
                 }
 
+                Section {
+                    NavigationLink {
+                        LivePage()
+                    } label: {
+                        Label("Vecanv Live Producer", systemImage: "wave.3.right")
+                    }
+                } header: {
+                    Text("Vecanv — Remote Scenes")
+                } footer: {
+                    Text("Polls a Vecanv producer for the active surface. Flip surfaces from the Mac via POST /canvas/active_surface — no app rebuild needed.")
+                }
+
                 Section("Samples") {
                     ForEach(SampleDemo.allCases.filter {
                         $0 != .actionContext && $0 != .formatFunctions && $0 != .incrementalUpdate
