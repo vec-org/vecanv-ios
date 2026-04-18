@@ -4,6 +4,38 @@
 import SwiftUI
 import v_08
 
+/// Applies a named theme to the A2UI component tree via SwiftUI style modifiers.
+/// Theme name comes from `beginRendering.styles["theme"]` emitted by the producer.
+struct VecanvThemeModifier: ViewModifier {
+    let theme: String
+
+    func body(content: Content) -> some View {
+        switch theme {
+        case "emerald":
+            content
+                .a2uiTextStyle(for: .h1, weight: .black, color: .green)
+                .a2uiTextStyle(for: .h4, color: .green.opacity(0.8))
+                .a2uiButtonStyle(for: .primary, backgroundColor: .green, cornerRadius: 14)
+                .a2uiCardStyle(cornerRadius: 18, shadowRadius: 6, backgroundColor: .green.opacity(0.08))
+        case "warm":
+            content
+                .a2uiTextStyle(for: .h1, weight: .black, color: .orange)
+                .a2uiTextStyle(for: .h4, color: .orange.opacity(0.8))
+                .a2uiButtonStyle(for: .primary, backgroundColor: .orange, cornerRadius: 14)
+                .a2uiCardStyle(cornerRadius: 18, shadowRadius: 6, backgroundColor: .orange.opacity(0.1))
+        case "dark":
+            content
+                .a2uiTextStyle(for: .h1, weight: .bold, color: .white)
+                .a2uiTextStyle(for: .h4, color: .white.opacity(0.85))
+                .a2uiTextStyle(for: .caption, color: .white.opacity(0.5))
+                .a2uiButtonStyle(for: .primary, backgroundColor: .indigo, cornerRadius: 4)
+                .a2uiCardStyle(cornerRadius: 4, shadowRadius: 0, backgroundColor: .black.opacity(0.7))
+        default:
+            content
+        }
+    }
+}
+
 /// Polls a remote Vecanv producer for the active scene and renders it.
 ///
 /// Flip the active surface on the producer side (e.g. via curl from Mac):
@@ -23,6 +55,7 @@ struct LivePage: View {
     @State private var polling = false
     @State private var editingURL = false
     @State private var activeSurface: String?
+    @State private var currentTheme: String = "default"
     @State private var lastPayloadHash: Int = 0
 
     private let pollInterval: TimeInterval = 2.0
@@ -42,6 +75,7 @@ struct LivePage: View {
                 ScrollView {
                     A2UIComponentView_V08(node: root, viewModel: viewModel)
                         .padding()
+                        .modifier(VecanvThemeModifier(theme: currentTheme))
                         .environment(\.a2uiActionHandler) { action in
                             Task { await handleAction(action) }
                         }
@@ -186,10 +220,12 @@ struct LivePage: View {
             let messages = try JSONDecoder().decode([ServerToClientMessage_V08].self, from: data)
             let fresh = SurfaceViewModel_V08()
             var surface: String?
+            var theme: String?
             for m in messages {
                 try fresh.processMessage(m)
                 if let br = m.beginRendering {
                     surface = br.surfaceId
+                    if let t = br.styles?["theme"] { theme = t }
                 }
             }
             await MainActor.run {
@@ -198,6 +234,7 @@ struct LivePage: View {
                 self.lastUpdate = Date()
                 self.lastError = nil
                 if let surface { self.activeSurface = surface }
+                if let theme { self.currentTheme = theme }
             }
         } catch {
             await MainActor.run {
