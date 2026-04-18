@@ -23,8 +23,16 @@ struct LivePage: View {
     @State private var polling = false
     @State private var editingURL = false
     @State private var activeSurface: String?
+    @State private var lastPayloadHash: Int = 0
 
     private let pollInterval: TimeInterval = 2.0
+
+    /// Producer base URL (e.g. https://host/canvas/scene → https://host)
+    private var producerBase: String {
+        var s = producerURLString
+        if let r = s.range(of: "/canvas/scene") { s.removeSubrange(r.lowerBound..<s.endIndex) }
+        return s
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -34,6 +42,9 @@ struct LivePage: View {
                 ScrollView {
                     A2UIComponentView_V08(node: root, viewModel: viewModel)
                         .padding()
+                        .environment(\.a2uiActionHandler) { action in
+                            Task { await handleAction(action) }
+                        }
                 }
             } else {
                 VStack(spacing: 12) {
@@ -165,6 +176,13 @@ struct LivePage: View {
             var request = URLRequest(url: url)
             request.timeoutInterval = 5
             let (data, _) = try await URLSession.shared.data(for: request)
+            // Skip re-render when payload hasn't changed — preserves local
+            // data-model state (like a half-typed input field) between polls.
+            let hash = data.hashValue
+            if hash == lastPayloadHash {
+                await MainActor.run { self.lastUpdate = Date(); self.lastError = nil }
+                return
+            }
             let messages = try JSONDecoder().decode([ServerToClientMessage_V08].self, from: data)
             let fresh = SurfaceViewModel_V08()
             var surface: String?
@@ -176,6 +194,7 @@ struct LivePage: View {
             }
             await MainActor.run {
                 self.viewModel = fresh
+                self.lastPayloadHash = hash
                 self.lastUpdate = Date()
                 self.lastError = nil
                 if let surface { self.activeSurface = surface }
@@ -184,6 +203,45 @@ struct LivePage: View {
             await MainActor.run {
                 self.lastError = error.localizedDescription
             }
+        }
+    }
+
+    /// Action handler invoked by A2UI Button taps. Routes known action
+    /// names to producer endpoints; generic enough that any producer
+    /// can add new surfaces with interactive buttons without an iOS
+    /// rebuild — as long as the action name maps to an existing route.
+    private func handleAction(_ action: ResolvedAction) async {
+        switch action.name {
+        case "chat_send":
+            await postChatSend(action)
+        default:
+            await MainActor.run { self.lastError = "Unknown action: \(action.name)" }
+        }
+    }
+
+    private func postChatSend(_ action: ResolvedAction) async {
+        // Extract the message string from the resolved action context.
+        // AnyCodable is an enum in this codebase — pattern-match on .string.
+        var message = ""
+        if case .string(let s) = action.context["message"] ?? .null {
+            message = s
+        }
+        let trimmed = message.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+
+        guard let url = URL(string: "\(producerBase)/chat") else { return }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try? JSONSerialization.data(withJSONObject: ["message": trimmed])
+        request.timeoutInterval = 60  // Claude can take a while
+        do {
+            _ = try await URLSession.shared.data(for: request)
+            // Force next poll to re-fetch so the new conversation shows up
+            await MainActor.run { self.lastPayloadHash = 0 }
+            await fetchOnce()
+        } catch {
+            await MainActor.run { self.lastError = "chat_send failed: \(error.localizedDescription)" }
         }
     }
 }
