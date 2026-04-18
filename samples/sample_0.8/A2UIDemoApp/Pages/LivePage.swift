@@ -15,7 +15,7 @@ import v_08
 /// This page will pick up the change within one poll interval.
 struct LivePage: View {
     @AppStorage("vecanv.producerURL")
-    private var producerURLString: String = "http://100.115.221.117:8500/canvas/scene"
+    private var producerURLString: String = "https://vectorhome-1.tail3698f2.ts.net/canvas/scene"
 
     @State private var viewModel = SurfaceViewModel_V08()
     @State private var lastUpdate: Date?
@@ -129,7 +129,10 @@ struct LivePage: View {
                         #endif
                 }
                 Section("Reset") {
-                    Button("Use vectorhome-1 default") {
+                    Button("Use vectorhome-1 default (HTTPS via Funnel)") {
+                        producerURLString = "https://vectorhome-1.tail3698f2.ts.net/canvas/scene"
+                    }
+                    Button("Use Tailscale direct HTTP (tailnet only)") {
                         producerURLString = "http://100.115.221.117:8500/canvas/scene"
                     }
                 }
