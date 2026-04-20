@@ -35,12 +35,75 @@ struct A2UICard_V08: View {
     var viewModel: SurfaceViewModel_V08
 
     @Environment(\.a2uiStyle) private var style
+    @Environment(\.vecanvThemeExtras) private var vecanvExtras
+
+    /// Returns the shape to clip the card to. Priority:
+    ///   1. VecanvThemeExtras.cardShape (e.g. `.bubble`) → custom Path
+    ///   2. card.cornerRadius → RoundedRectangle
+    ///   3. No rounding → plain Rectangle
+    @ViewBuilder
+    private func background<V: View>(for view: V, radius r: CGFloat?) -> some View {
+        let gradient = vecanvExtras.cardFillGradient?.asShapeStyle()
+        let bgColor = style.cardStyle.backgroundColor
+        let border = vecanvExtras.cardBorderColor
+
+        if let kind = vecanvExtras.cardShape, kind != .rect {
+            let shape = VecanvShape(kind: kind)
+            view
+                .background {
+                    if let gradient {
+                        shape.fill(gradient)
+                    } else if let bgColor {
+                        shape.fill(bgColor)
+                    } else {
+                        shape.fill(.background)
+                    }
+                }
+                .overlay {
+                    if let border {
+                        shape.stroke(border, lineWidth: 1)
+                    }
+                }
+                .clipShape(shape)
+        } else if let r {
+            let shape = RoundedRectangle(cornerRadius: r, style: .continuous)
+            view
+                .background {
+                    if let gradient {
+                        shape.fill(gradient)
+                    } else if let bgColor {
+                        shape.fill(bgColor)
+                    } else {
+                        shape.fill(.background)
+                    }
+                }
+                .overlay {
+                    if let border {
+                        shape.stroke(border, lineWidth: 1)
+                    }
+                }
+                .clipShape(shape)
+        } else {
+            view
+                .background {
+                    if let gradient {
+                        Rectangle().fill(gradient)
+                    } else if let bgColor {
+                        Rectangle().fill(bgColor)
+                    } else {
+                        Rectangle().fill(.background)
+                    }
+                }
+        }
+    }
 
     var body: some View {
         if let child = node.children.first {
             let card = style.cardStyle
+            let shadowOpacity = vecanvExtras.cardShadowOpacity
+            let shadowRadius = card.shadowRadius ?? (shadowOpacity != nil ? 8 : nil)
 
-            A2UIComponentView_V08(node: child, viewModel: viewModel)
+            let content = A2UIComponentView_V08(node: child, viewModel: viewModel)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .modify { view in
                     if let p = card.padding {
@@ -49,32 +112,15 @@ struct A2UICard_V08: View {
                         view.padding()
                     }
                 }
+
+            background(for: content, radius: card.cornerRadius)
                 .modify { view in
-                    if let r = card.cornerRadius {
-                        let shape = RoundedRectangle(cornerRadius: r, style: .continuous)
-                        if let bg = card.backgroundColor {
-                            view.background(bg, in: shape).clipShape(shape)
-                        } else {
-                            view.background(.background, in: shape).clipShape(shape)
-                        }
-                    } else {
-                        if let bg = card.backgroundColor {
-                            view.background(bg)
-                        } else {
-                            view.background(.background)
-                        }
+                    if let sr = shadowRadius {
+                        let color = card.shadowColor
+                            ?? .black.opacity(shadowOpacity ?? 0.1)
+                        return AnyView(view.shadow(color: color, radius: sr, y: card.shadowY ?? 1))
                     }
-                }
-                .modify { view in
-                    if let sr = card.shadowRadius {
-                        view.shadow(
-                            color: card.shadowColor ?? .black.opacity(0.1),
-                            radius: sr,
-                            y: card.shadowY ?? 1
-                        )
-                    } else {
-                        view
-                    }
+                    return AnyView(view)
                 }
         }
     }
