@@ -111,6 +111,11 @@ public struct A2UIStyle: Equatable, Sendable {
     }
 
     /// Build from the raw `[String: String]` dictionary provided by `beginRendering`.
+    ///
+    /// Parses the full Vecanv theme vocabulary — color keys, corner radii,
+    /// per-variant button fills — into the existing struct fields so that
+    /// even components unaware of `VecanvThemeExtras` still get baseline
+    /// visual treatment (rounded corners, brand colors).
     public init(from styles: [String: String]) {
         if let hex = styles["primaryColor"] {
             self.primaryColor = Color(hex: hex)
@@ -121,8 +126,36 @@ public struct A2UIStyle: Equatable, Sendable {
         self.textStyles = [:]
         self.iconOverrides = [:]
         self.imageStyles = [:]
-        self.cardStyle = .init()
-        self.buttonStyles = [:]
+
+        // CardStyle — populate corner radius + background color from
+        // theme keys so vanilla A2UICard reflects the theme at least
+        // partially, even without VecanvThemeExtras.
+        self.cardStyle = .init(
+            cornerRadius: styles["cardCornerRadius"].flatMap { Double($0) }.map { CGFloat($0) },
+            shadowRadius: styles["cardShadowOpacity"].flatMap { Double($0) != nil ? 6 : nil },
+            backgroundColor: styles["cardBackgroundColor"].map { Color(hex: $0) }
+        )
+
+        // Button variants — map primary/default from theme.
+        var btns: [String: ButtonVariantStyle] = [:]
+        let btnCornerRadius: CGFloat? = styles["buttonCornerRadius"].flatMap { Double($0) }.map { CGFloat($0) }
+        if let fill = styles["buttonPrimaryFill"] {
+            btns["primary"] = ButtonVariantStyle(
+                foregroundColor: styles["buttonPrimaryTextColor"].map { Color(hex: $0) },
+                backgroundColor: Color(hex: fill),
+                cornerRadius: btnCornerRadius
+            )
+        }
+        if let fill = styles["buttonSecondaryFill"] {
+            let bg: Color = (fill == "transparent") ? .clear : Color(hex: fill)
+            btns["default"] = ButtonVariantStyle(
+                foregroundColor: styles["buttonSecondaryText"].map { Color(hex: $0) },
+                backgroundColor: bg,
+                cornerRadius: btnCornerRadius
+            )
+        }
+        self.buttonStyles = btns
+
         self.checkBoxStyle = .init()
         self.multipleChoiceStyle = .init()
         self.textFieldStyle = .init()

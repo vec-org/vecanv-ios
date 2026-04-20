@@ -29,6 +29,9 @@ public final class SurfaceViewModel_V08 {
     public var components: [String: RawComponentInstance_V08] = [:]
     public var styles: [String: String] = [:]
     public var a2uiStyle = A2UIStyle()
+    /// Vecanv-specific theme extras (shape, gradient, animation) parsed
+    /// from the same styles dict as `a2uiStyle`. See VecanvThemeExtras.
+    public var vecanvThemeExtras = VecanvThemeExtras()
     public var lastAction: ResolvedAction?
     public var componentTree: ComponentNode_V08?
 
@@ -76,6 +79,7 @@ public final class SurfaceViewModel_V08 {
         rootComponentId = message.root
         styles = message.styles ?? [:]
         a2uiStyle = A2UIStyle(from: styles)
+        vecanvThemeExtras = VecanvThemeExtras.parse(from: styles)
         rebuildComponentTree()
     }
 
@@ -113,6 +117,7 @@ public final class SurfaceViewModel_V08 {
         dataStore.removeAll()
         styles.removeAll()
         a2uiStyle = A2UIStyle()
+        vecanvThemeExtras = VecanvThemeExtras()
         componentTree = nil
     }
 
